@@ -2,7 +2,7 @@ with import <nixpkgs> {};
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    cmake pkg-config llvmPackages_14.libclang  llvmPackages_14.clang openssl mbedtls rustup  rust-analyzer fontconfig  gdk-pixbuf cairo gtk3 webkitgtk wayland libxkbcommon
+    cmake pkg-config llvmPackages_14.libclang  llvmPackages_14.clang openssl mbedtls rustup  rust-analyzer fontconfig  gdk-pixbuf cairo gtk3 webkitgtk wayland libxkbcommon python3
   ];
   nativeBuildInputs = with pkgs; [
     rustPlatform.bindgenHook

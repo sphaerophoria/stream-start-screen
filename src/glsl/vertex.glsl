@@ -10,5 +10,5 @@ void main() {
     vert = texture_coord;
     vec2 v = in_vert * 2.0 - 1.0;
     v.y *= aspect_ratio;
-    gl_Position = vec4(v, 0.0, 1.0);
+    gl_Position = vec4(v, -1.0, 1.0);
 }
