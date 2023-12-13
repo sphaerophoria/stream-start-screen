@@ -3,7 +3,7 @@ use glow::{HasContext, NativeBuffer, NativeProgram, NativeTexture, NativeVertexA
 use thiserror::Error;
 
 use crate::mat::Transform;
-use crate::obj_parser::{Mesh, VertAndUv};
+use crate::obj_parser::{Mesh, VertData};
 use crate::{gl_util, GlError};
 
 pub struct GpuMesh<'a> {
@@ -40,6 +40,7 @@ pub struct MeshRenderer<'a> {
     program: NativeProgram,
     vert_loc: u32,
     uv_loc: u32,
+    norm_loc: u32,
     model_loc: <glow::Context as HasContext>::UniformLocation,
     view_loc: <glow::Context as HasContext>::UniformLocation,
     gl: &'a glow::Context,
@@ -62,6 +63,10 @@ impl<'a> MeshRenderer<'a> {
                 .get_attrib_location(program, "in_uv")
                 .expect("No in vert");
 
+            let norm_loc = gl
+                .get_attrib_location(program, "in_normal")
+                .expect("Invalid vertex shader");
+
             let model_loc = gl
                 .get_uniform_location(program, "model")
                 .expect("Invalid vertex shader");
@@ -76,6 +81,7 @@ impl<'a> MeshRenderer<'a> {
                 model_loc,
                 view_loc,
                 uv_loc,
+                norm_loc,
                 gl,
             })
         }
@@ -113,15 +119,16 @@ impl<'a> MeshRenderer<'a> {
                 glow::STATIC_DRAW,
             );
 
-            const STRIDE: i32 = std::mem::size_of::<VertAndUv>() as i32;
-            assert_eq!(STRIDE as usize, 6 * std::mem::size_of::<f32>());
+            const STRIDE: i32 = std::mem::size_of::<VertData>() as i32;
+            assert_eq!(STRIDE as usize, 9 * std::mem::size_of::<f32>());
+
             gl.vertex_attrib_pointer_f32(
                 self.vert_loc,
                 4,
                 glow::FLOAT,
                 false,
                 STRIDE,
-                VertAndUv::vert_offset(),
+                VertData::vert_offset(),
             );
             gl.enable_vertex_attrib_array(0);
 
@@ -131,9 +138,19 @@ impl<'a> MeshRenderer<'a> {
                 glow::FLOAT,
                 false,
                 STRIDE,
-                VertAndUv::uv_offset(),
+                VertData::uv_offset(),
             );
             gl.enable_vertex_attrib_array(1);
+
+            gl.vertex_attrib_pointer_f32(
+                self.norm_loc,
+                3,
+                glow::FLOAT,
+                false,
+                STRIDE,
+                VertData::normal_offset(),
+            );
+            gl.enable_vertex_attrib_array(2);
 
             let num_elements = mesh.faces.len() * mesh.faces[0].len();
 

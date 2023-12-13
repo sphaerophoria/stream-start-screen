@@ -4,6 +4,7 @@
 
 in vec4 in_vert;
 in vec2 in_uv;
+in vec3 in_normal;
 
 uniform mat4 model = mat4(
     cos(M_PI / 4), -sin(M_PI / 4), 0, 0,
@@ -19,6 +20,7 @@ uniform mat4 view = mat4(
 );
 
 out vec2 uv;
+out vec3 normal;
 
 void main() {
     vec4 out_vert = in_vert;
@@ -29,4 +31,5 @@ void main() {
     gl_Position = out_vert;
 
     uv = in_uv;
+    normal = in_normal;
 }

@@ -15,44 +15,55 @@ pub enum ObjParseError {
     MissingFaceVert,
     InvalidFaceVert(std::num::ParseIntError),
     InvalidFaceUv(std::num::ParseIntError),
+    InvalidFaceNorm(std::num::ParseIntError),
     MissingTexCoord,
     NonFloatTexCoord(std::num::ParseFloatError),
 }
 
 #[repr(C)]
 #[derive(Debug, Default)]
-pub struct VertAndUv {
+pub struct VertData {
     pub vert: [f32; 4],
     pub uv: [f32; 2],
+    pub norm: [f32; 3],
 }
 
-impl VertAndUv {
-    const fn new() -> VertAndUv {
-        VertAndUv {
+impl VertData {
+    const fn new() -> VertData {
+        VertData {
             vert: [0.0; 4],
             uv: [0.0; 2],
+            norm: [0.0; 3],
         }
     }
     pub const fn vert_offset() -> i32 {
-        let obj = VertAndUv::new();
+        let obj = VertData::new();
         unsafe {
             (std::ptr::addr_of!(obj.vert) as *const u8)
-                .offset_from(&obj as *const VertAndUv as *const u8) as i32
+                .offset_from(&obj as *const VertData as *const u8) as i32
         }
     }
 
     pub const fn uv_offset() -> i32 {
-        let obj = VertAndUv::new();
+        let obj = VertData::new();
         unsafe {
             (std::ptr::addr_of!(obj.uv) as *const u8)
-                .offset_from(&obj as *const VertAndUv as *const u8) as i32
+                .offset_from(&obj as *const VertData as *const u8) as i32
+        }
+    }
+
+    pub const fn normal_offset() -> i32 {
+        let obj = VertData::new();
+        unsafe {
+            (std::ptr::addr_of!(obj.norm) as *const u8)
+                .offset_from(&obj as *const VertData as *const u8) as i32
         }
     }
 }
 
 #[derive(Debug)]
 pub struct Mesh {
-    pub vertices: Vec<VertAndUv>,
+    pub vertices: Vec<VertData>,
     pub faces: Vec<[u32; 3]>,
 }
 
@@ -61,6 +72,7 @@ impl Mesh {
         let mut vertices = Vec::new();
         let mut faces = Vec::new();
         let mut tex_coords = Vec::new();
+        let mut normals = Vec::new();
 
         for line in r.lines() {
             let line = line.map_err(ObjParseError::FileRead)?;
@@ -80,26 +92,44 @@ impl Mesh {
                     let v = parse_tex_coord(line_it)?;
                     tex_coords.push(v);
                 }
+                "vn" => {
+                    let v = parse_vertex_3(line_it)?;
+                    normals.push(v);
+                }
                 t => {
                     println!("Unsupported type {t}");
                 }
             }
         }
 
-        Ok(obj_data_to_mesh(&vertices, &tex_coords, &faces))
+        Ok(obj_data_to_mesh(&vertices, &tex_coords, &normals, &faces))
     }
 }
 
-fn parse_vertex<'a, It: Iterator<Item = &'a str>>(mut it: It) -> Result<[f32; 4], ObjParseError> {
-    let mut res = [0f32; 4];
-
-    for i in 0..3 {
-        res[i] = it
+fn parse_vertex_n<'a, It: Iterator<Item = &'a str>>(
+    it: &mut It,
+    data: &mut [f32],
+) -> Result<(), ObjParseError> {
+    for i in 0..data.len() {
+        data[i] = it
             .next()
             .ok_or(ObjParseError::MissingVertex)?
             .parse()
             .map_err(ObjParseError::NonFloatVertex)?;
     }
+    Ok(())
+}
+
+fn parse_vertex_3<'a, It: Iterator<Item = &'a str>>(mut it: It) -> Result<[f32; 3], ObjParseError> {
+    let mut res = [0f32; 3];
+    parse_vertex_n(&mut it, &mut res)?;
+    Ok(res)
+}
+
+fn parse_vertex<'a, It: Iterator<Item = &'a str>>(mut it: It) -> Result<[f32; 4], ObjParseError> {
+    let mut res = [0f32; 4];
+
+    parse_vertex_n(&mut it, &mut res[0..3])?;
 
     res[3] = match it.next() {
         Some(v) => v.parse().map_err(ObjParseError::NonFloatVertex)?,
@@ -127,11 +157,23 @@ fn parse_tex_coord<'a, It: Iterator<Item = &'a str>>(
 
 fn parse_face<'a, It: Iterator<Item = &'a str>>(
     mut it: It,
-) -> Result<[VertAndUvIndex; 3], ObjParseError> {
+) -> Result<[FaceIndices; 3], ObjParseError> {
     let mut ret = [
-        VertAndUvIndex { vert: 0, uv: 0 },
-        VertAndUvIndex { vert: 0, uv: 0 },
-        VertAndUvIndex { vert: 0, uv: 0 },
+        FaceIndices {
+            vert: 0,
+            uv: 0,
+            norm: 0,
+        },
+        FaceIndices {
+            vert: 0,
+            uv: 0,
+            norm: 0,
+        },
+        FaceIndices {
+            vert: 0,
+            uv: 0,
+            norm: 0,
+        },
     ];
 
     for i in 0..3 {
@@ -152,25 +194,35 @@ fn parse_face<'a, It: Iterator<Item = &'a str>>(
             .parse::<u32>()
             .map_err(ObjParseError::InvalidFaceUv)?
             - 1u32;
+
+        let norm_id = face_it
+            .next()
+            .expect("third element doesn't exist for obj face");
+        ret[i].norm = norm_id
+            .parse::<u32>()
+            .map_err(ObjParseError::InvalidFaceNorm)?
+            - 1u32;
     }
 
     Ok(ret)
 }
 
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq)]
-struct VertAndUvIndex {
+struct FaceIndices {
     vert: u32,
     uv: u32,
+    norm: u32,
 }
 
 fn obj_data_to_mesh(
     in_vertices: &[[f32; 4]],
     in_uvs: &[[f32; 2]],
-    in_faces: &[[VertAndUvIndex; 3]],
+    in_normals: &[[f32; 3]],
+    in_faces: &[[FaceIndices; 3]],
 ) -> Mesh {
     type MergedIndex = u32;
 
-    let mut mapping: HashMap<VertAndUvIndex, MergedIndex> = HashMap::new();
+    let mut mapping: HashMap<FaceIndices, MergedIndex> = HashMap::new();
     // If we've seen this, take the index of vert_and_uv for that pair
     // If we haven't seen it, create a new vert/uv pair and push into vert_and_uv
     let mut output_vert_and_uv = Vec::new();
@@ -181,9 +233,10 @@ fn obj_data_to_mesh(
 
         for (i, vert) in face.iter().enumerate() {
             let entry = mapping.entry(*vert).or_insert_with(|| {
-                output_vert_and_uv.push(VertAndUv {
+                output_vert_and_uv.push(VertData {
                     vert: in_vertices[vert.vert as usize],
                     uv: in_uvs[vert.uv as usize],
+                    norm: in_normals[vert.norm as usize],
                 });
 
                 (output_vert_and_uv.len() - 1).try_into().unwrap()
@@ -248,9 +301,21 @@ mod test {
         match parse_face("1/2/3 2/3/4 3/4/5".split_whitespace()) {
             Ok(v) => assert_eq!(
                 [
-                    VertAndUvIndex { vert: 0, uv: 1 },
-                    VertAndUvIndex { vert: 1, uv: 2 },
-                    VertAndUvIndex { vert: 2, uv: 3 }
+                    FaceIndices {
+                        vert: 0,
+                        uv: 1,
+                        norm: 2
+                    },
+                    FaceIndices {
+                        vert: 1,
+                        uv: 2,
+                        norm: 3
+                    },
+                    FaceIndices {
+                        vert: 2,
+                        uv: 3,
+                        norm: 4
+                    }
                 ],
                 v
             ),
@@ -260,7 +325,7 @@ mod test {
 
     #[test]
     fn test_face_parse_not_enough_elems() {
-        match parse_face("1/1 2/2".split_whitespace()) {
+        match parse_face("1/1/1 2/2/2".split_whitespace()) {
             Ok(_) => panic!("Face parse should have failed"),
             Err(ObjParseError::MissingFaceVert) => (),
             _ => panic!("Unexpected error for face parse"),
@@ -269,18 +334,18 @@ mod test {
 
     #[test]
     fn test_face_parse_invalid_index() {
-        match parse_face("1.1/1 2/2 3/3".split_whitespace()) {
+        match parse_face("1.1/1/1 2/2/2 3/3/3".split_whitespace()) {
             Ok(_) => panic!("Face parse should have failed"),
             Err(ObjParseError::InvalidFaceVert(_)) => (),
             e => panic!("Unexpected error for face parse: {e:?}"),
         }
-        match parse_face("1/1.2 2/2 3/3".split_whitespace()) {
+        match parse_face("1/1.2/1 2/2/2 3/3/3".split_whitespace()) {
             Ok(_) => panic!("Face parse should have failed"),
             Err(ObjParseError::InvalidFaceUv(_)) => (),
             e => panic!("Unexpected error for face parse: {e:?}"),
         }
 
-        match parse_face("1/1 2/2 asdf/3".split_whitespace()) {
+        match parse_face("1/1/1 2/2/2 asdf/3/3".split_whitespace()) {
             Ok(_) => panic!("Face parse should have failed"),
             Err(ObjParseError::InvalidFaceVert(_)) => (),
             e => panic!("Unexpected error for face parse: {e:?}"),

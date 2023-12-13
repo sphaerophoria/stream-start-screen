@@ -2,6 +2,7 @@
 precision mediump float;
 
 in vec2 uv;
+in vec3 normal;
 
 uniform sampler2D tex;
 
@@ -11,5 +12,5 @@ void main() {
     vec2 adjusted_uv = uv;
     // Invert Y as texture is top to bottom, but UV coords are bottom to top
     adjusted_uv.y = 1.0 - adjusted_uv.y;
-    out_color = texture(tex, adjusted_uv);
+    out_color = texture(tex, adjusted_uv) * vec4(normal, 1.0);
 }
