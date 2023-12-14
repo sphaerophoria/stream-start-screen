@@ -45,6 +45,7 @@ pub struct MeshRenderer<'a> {
     view_loc: <glow::Context as HasContext>::UniformLocation,
     light_dir_loc: <glow::Context as HasContext>::UniformLocation,
     light_color_loc: <glow::Context as HasContext>::UniformLocation,
+    aspect_loc: <glow::Context as HasContext>::UniformLocation,
     gl: &'a glow::Context,
 }
 
@@ -85,6 +86,10 @@ impl<'a> MeshRenderer<'a> {
                 .get_uniform_location(program, "light_color")
                 .expect("Invalid vertex shader");
 
+            let aspect_loc = gl
+                .get_uniform_location(program, "aspect")
+                .expect("Invalid vertex shader");
+
             Ok(MeshRenderer {
                 program,
                 vert_loc,
@@ -92,6 +97,7 @@ impl<'a> MeshRenderer<'a> {
                 view_loc,
                 light_dir_loc,
                 light_color_loc,
+                aspect_loc,
                 uv_loc,
                 norm_loc,
                 gl,
@@ -215,6 +221,15 @@ impl<'a> MeshRenderer<'a> {
 
             self.gl
                 .uniform_3_f32(Some(&self.light_color_loc), color[0], color[1], color[2]);
+            self.gl.use_program(None);
+        }
+    }
+
+    pub fn set_aspect(&self, aspect_ratio: f32) {
+        unsafe {
+            self.gl.use_program(Some(self.program));
+
+            self.gl.uniform_1_f32(Some(&self.aspect_loc), aspect_ratio);
             self.gl.use_program(None);
         }
     }

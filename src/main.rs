@@ -234,7 +234,7 @@ impl App<'_> {
         self.suzanne_pos -= time_since_last;
         let camera_pos = Transform::from_axis_angle(self.suzanne_pos, mat::Axis::Y)
             * Transform::from_axis_angle(0.5, mat::Axis::X)
-            * Transform::from_translation(0.0, -0.1, -0.75);
+            * Transform::from_translation(0.0, -0.1, -0.60);
         self.mesh_renderer.set_camera_transform(&camera_pos);
         self.mesh_renderer.set_light_dir(&[
             f32::cos(self.suzanne_pos * 7.0),
@@ -274,6 +274,7 @@ impl App<'_> {
             );
         }
 
+        self.mesh_renderer.set_aspect(WINDOW_ASPECT);
         self.mesh_renderer
             .render(&self.suzanne, &Transform::from_translation(0.25, 0.0, 0.0));
         self.mesh_renderer
