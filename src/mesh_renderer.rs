@@ -43,6 +43,8 @@ pub struct MeshRenderer<'a> {
     norm_loc: u32,
     model_loc: <glow::Context as HasContext>::UniformLocation,
     view_loc: <glow::Context as HasContext>::UniformLocation,
+    light_dir_loc: <glow::Context as HasContext>::UniformLocation,
+    light_color_loc: <glow::Context as HasContext>::UniformLocation,
     gl: &'a glow::Context,
 }
 
@@ -75,11 +77,21 @@ impl<'a> MeshRenderer<'a> {
                 .get_uniform_location(program, "view")
                 .expect("Invalid vertex shader");
 
+            let light_dir_loc = gl
+                .get_uniform_location(program, "light_dir")
+                .expect("Invalid vertex shader");
+
+            let light_color_loc = gl
+                .get_uniform_location(program, "light_color")
+                .expect("Invalid vertex shader");
+
             Ok(MeshRenderer {
                 program,
                 vert_loc,
                 model_loc,
                 view_loc,
+                light_dir_loc,
+                light_color_loc,
                 uv_loc,
                 norm_loc,
                 gl,
@@ -177,6 +189,32 @@ impl<'a> MeshRenderer<'a> {
                 true,
                 std::slice::from_raw_parts(transform.arr[0].as_ptr(), 16),
             );
+            self.gl.use_program(None);
+        }
+    }
+
+    pub fn set_light_dir(&self, dir: &[f32; 3]) {
+        unsafe {
+            self.gl.use_program(Some(self.program));
+
+            let length: f32 = dir.iter().map(|v| v * v).sum();
+
+            self.gl.uniform_3_f32(
+                Some(&self.light_dir_loc),
+                dir[0] / length,
+                dir[1] / length,
+                dir[2] / length,
+            );
+            self.gl.use_program(None);
+        }
+    }
+
+    pub fn set_light_color(&self, color: &[f32; 3]) {
+        unsafe {
+            self.gl.use_program(Some(self.program));
+
+            self.gl
+                .uniform_3_f32(Some(&self.light_color_loc), color[0], color[1], color[2]);
             self.gl.use_program(None);
         }
     }

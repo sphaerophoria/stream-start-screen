@@ -236,6 +236,12 @@ impl App<'_> {
             * Transform::from_axis_angle(0.5, mat::Axis::X)
             * Transform::from_translation(0.0, -0.1, -0.75);
         self.mesh_renderer.set_camera_transform(&camera_pos);
+        self.mesh_renderer.set_light_dir(&[
+            f32::cos(self.suzanne_pos * 7.0),
+            -1.0,
+            f32::sin(self.suzanne_pos * 7.0),
+        ]);
+        self.mesh_renderer.set_light_color(&[0.8, 0.8, 0.7]);
         self.last_update = now;
     }
 
