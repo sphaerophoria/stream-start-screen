@@ -167,8 +167,10 @@ struct App<'a> {
     cursor_flip_time: Instant,
     cursor_blink_duration: Duration,
     last_update: Instant,
-    suzanne_pos: f32,
-    suzanne: GpuMesh<'a>,
+    time: f32,
+    monitor: GpuMesh<'a>,
+    screen: GpuMesh<'a>,
+    table: GpuMesh<'a>,
 }
 
 impl App<'_> {
@@ -189,12 +191,29 @@ impl App<'_> {
         let cursor_blink_duration: Duration = Duration::from_secs_f32(0.5);
         let cursor_flip_time = Instant::now() + cursor_blink_duration;
 
-        let suzanne = obj_parser::Mesh::from_obj_file(include_bytes!("../suzanne.obj").as_slice())
-            .map_err(MainError::LoadSuzanne)?;
-        let tex = load_texture_from_png(gl, include_bytes!("../suz_texture.png").as_slice());
-        let suzanne = mesh_renderer
-            .upload_mesh(&suzanne, tex)
-            .map_err(MainError::UploadSuzanne)?;
+        let monitor = obj_parser::Mesh::from_obj_file(include_bytes!("../monitor.obj").as_slice())
+            .map_err(MainError::LoadMonitor)?;
+        let screen = obj_parser::Mesh::from_obj_file(include_bytes!("../screen.obj").as_slice())
+            .map_err(MainError::LoadScreen)?;
+        let table = obj_parser::Mesh::from_obj_file(include_bytes!("../table.obj").as_slice())
+            .map_err(MainError::LoadTable)?;
+
+        let monitor_tex =
+            load_texture_from_png(gl, include_bytes!("../monitor_texture.png").as_slice());
+        let screen_tex =
+            load_texture_from_png(gl, include_bytes!("../screen_textuire.png").as_slice());
+        let table_tex =
+            load_texture_from_png(gl, include_bytes!("../table_texture.png").as_slice());
+
+        let monitor = mesh_renderer
+            .upload_mesh(&monitor, monitor_tex)
+            .map_err(MainError::UploadMonitor)?;
+        let screen = mesh_renderer
+            .upload_mesh(&screen, screen_tex)
+            .map_err(MainError::UploadScreen)?;
+        let table = mesh_renderer
+            .upload_mesh(&table, table_tex)
+            .map_err(MainError::UploadTable)?;
 
         Ok(App {
             args,
@@ -206,9 +225,11 @@ impl App<'_> {
             cursor_visible,
             cursor_flip_time,
             cursor_blink_duration,
-            suzanne_pos: 0.0,
+            time: 0.0,
             last_update: Instant::now(),
-            suzanne,
+            monitor,
+            screen,
+            table,
         })
     }
 
@@ -231,16 +252,13 @@ impl App<'_> {
 
         self.current_animation.update(now);
 
-        self.suzanne_pos -= time_since_last;
-        let camera_pos = Transform::from_axis_angle(self.suzanne_pos, mat::Axis::Y)
+        self.time -= time_since_last;
+        let camera_pos = Transform::from_axis_angle(self.time, mat::Axis::Y)
             * Transform::from_axis_angle(0.5, mat::Axis::X)
-            * Transform::from_translation(0.0, -0.1, -0.60);
+            * Transform::from_translation(0.0, 0.0, -1.5);
         self.mesh_renderer.set_camera_transform(&camera_pos);
-        self.mesh_renderer.set_light_dir(&[
-            f32::cos(self.suzanne_pos * 7.0),
-            -1.0,
-            f32::sin(self.suzanne_pos * 7.0),
-        ]);
+        self.mesh_renderer
+            .set_light_dir(&[f32::cos(self.time), -1.0, f32::sin(self.time)]);
         self.mesh_renderer.set_light_color(&[0.8, 0.8, 0.7]);
         self.last_update = now;
     }
@@ -276,9 +294,11 @@ impl App<'_> {
 
         self.mesh_renderer.set_aspect(WINDOW_ASPECT);
         self.mesh_renderer
-            .render(&self.suzanne, &Transform::from_translation(0.25, 0.0, 0.0));
+            .render(&self.table, &Transform::from_translation(0.0, 0.0, 0.0));
         self.mesh_renderer
-            .render(&self.suzanne, &Transform::from_translation(-0.25, 0.0, 0.0));
+            .render(&self.monitor, &Transform::from_translation(0.0, 0.0, 0.0));
+        self.mesh_renderer
+            .render(&self.screen, &Transform::from_translation(0.0, 0.0, 0.0));
     }
 }
 
@@ -296,10 +316,18 @@ enum MainError {
     CreateCursorRenderer(GlError),
     #[error("failed to create mesh renderer")]
     CreateMeshRenderer(GlError),
-    #[error("failed to load suzanne")]
-    LoadSuzanne(ObjParseError),
-    #[error("failed to upload suzanne to gpu")]
-    UploadSuzanne(UploadMeshError),
+    #[error("failed to load table obj")]
+    LoadTable(ObjParseError),
+    #[error("failed to load monitor obj")]
+    LoadMonitor(ObjParseError),
+    #[error("failed to load screen obj")]
+    LoadScreen(ObjParseError),
+    #[error("failed to upload table to gpu")]
+    UploadTable(UploadMeshError),
+    #[error("failed to upload monitor to gpu")]
+    UploadMonitor(UploadMeshError),
+    #[error("failed to upload screen to gpu")]
+    UploadScreen(UploadMeshError),
     #[error("failed to get character")]
     GetCharacter(#[from] glyph_cache::GetCharacterError),
 }

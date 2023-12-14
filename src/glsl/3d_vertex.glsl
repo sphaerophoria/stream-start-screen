@@ -30,6 +30,9 @@ void main() {
     out_vert = inverse(view) * model * out_vert;
 
     out_vert.xy /= out_vert.z;
+    out_vert.z -= 1.0;
+    out_vert.z /= 100.0;
+
     out_vert.x /= aspect;
 
     gl_Position = out_vert;
