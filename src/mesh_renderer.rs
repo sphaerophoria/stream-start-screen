@@ -38,14 +38,14 @@ pub enum UploadMeshError {
 
 pub struct MeshRenderer<'a> {
     program: NativeProgram,
-    vert_loc: u32,
-    uv_loc: u32,
-    norm_loc: u32,
-    model_loc: <glow::Context as HasContext>::UniformLocation,
-    view_loc: <glow::Context as HasContext>::UniformLocation,
-    light_dir_loc: <glow::Context as HasContext>::UniformLocation,
-    light_color_loc: <glow::Context as HasContext>::UniformLocation,
-    aspect_loc: <glow::Context as HasContext>::UniformLocation,
+    vert_loc: Option<u32>,
+    uv_loc: Option<u32>,
+    norm_loc: Option<u32>,
+    model_loc: Option<<glow::Context as HasContext>::UniformLocation>,
+    view_loc: Option<<glow::Context as HasContext>::UniformLocation>,
+    light_dir_loc: Option<<glow::Context as HasContext>::UniformLocation>,
+    light_color_loc: Option<<glow::Context as HasContext>::UniformLocation>,
+    aspect_loc: Option<<glow::Context as HasContext>::UniformLocation>,
     gl: &'a glow::Context,
 }
 
@@ -58,37 +58,21 @@ impl<'a> MeshRenderer<'a> {
                 include_str!("glsl/3d_fragment.glsl"),
             );
 
-            let vert_loc = gl
-                .get_attrib_location(program, "in_vert")
-                .expect("No in vert");
+            let vert_loc = gl.get_attrib_location(program, "in_vert");
 
-            let uv_loc = gl
-                .get_attrib_location(program, "in_uv")
-                .expect("No in vert");
+            let uv_loc = gl.get_attrib_location(program, "in_uv");
 
-            let norm_loc = gl
-                .get_attrib_location(program, "in_normal")
-                .expect("Invalid vertex shader");
+            let norm_loc = gl.get_attrib_location(program, "in_normal");
 
-            let model_loc = gl
-                .get_uniform_location(program, "model")
-                .expect("Invalid vertex shader");
+            let model_loc = gl.get_uniform_location(program, "model");
 
-            let view_loc = gl
-                .get_uniform_location(program, "view")
-                .expect("Invalid vertex shader");
+            let view_loc = gl.get_uniform_location(program, "view");
 
-            let light_dir_loc = gl
-                .get_uniform_location(program, "light_dir")
-                .expect("Invalid vertex shader");
+            let light_dir_loc = gl.get_uniform_location(program, "light_dir");
 
-            let light_color_loc = gl
-                .get_uniform_location(program, "light_color")
-                .expect("Invalid vertex shader");
+            let light_color_loc = gl.get_uniform_location(program, "light_color");
 
-            let aspect_loc = gl
-                .get_uniform_location(program, "aspect")
-                .expect("Invalid vertex shader");
+            let aspect_loc = gl.get_uniform_location(program, "aspect");
 
             Ok(MeshRenderer {
                 program,
@@ -140,35 +124,41 @@ impl<'a> MeshRenderer<'a> {
             const STRIDE: i32 = std::mem::size_of::<VertData>() as i32;
             assert_eq!(STRIDE as usize, 9 * std::mem::size_of::<f32>());
 
-            gl.vertex_attrib_pointer_f32(
-                self.vert_loc,
-                4,
-                glow::FLOAT,
-                false,
-                STRIDE,
-                VertData::vert_offset(),
-            );
-            gl.enable_vertex_attrib_array(0);
+            if let Some(vert_loc) = &self.vert_loc {
+                gl.vertex_attrib_pointer_f32(
+                    *vert_loc,
+                    4,
+                    glow::FLOAT,
+                    false,
+                    STRIDE,
+                    VertData::vert_offset(),
+                );
+                gl.enable_vertex_attrib_array(0);
+            }
 
-            gl.vertex_attrib_pointer_f32(
-                self.uv_loc,
-                2,
-                glow::FLOAT,
-                false,
-                STRIDE,
-                VertData::uv_offset(),
-            );
-            gl.enable_vertex_attrib_array(1);
+            if let Some(uv_loc) = &self.uv_loc {
+                gl.vertex_attrib_pointer_f32(
+                    *uv_loc,
+                    2,
+                    glow::FLOAT,
+                    false,
+                    STRIDE,
+                    VertData::uv_offset(),
+                );
+                gl.enable_vertex_attrib_array(1);
+            }
 
-            gl.vertex_attrib_pointer_f32(
-                self.norm_loc,
-                3,
-                glow::FLOAT,
-                false,
-                STRIDE,
-                VertData::normal_offset(),
-            );
-            gl.enable_vertex_attrib_array(2);
+            if let Some(norm_loc) = &self.norm_loc {
+                gl.vertex_attrib_pointer_f32(
+                    *norm_loc,
+                    3,
+                    glow::FLOAT,
+                    false,
+                    STRIDE,
+                    VertData::normal_offset(),
+                );
+                gl.enable_vertex_attrib_array(2);
+            }
 
             let num_elements = mesh.faces.len() * mesh.faces[0].len();
 
@@ -191,7 +181,7 @@ impl<'a> MeshRenderer<'a> {
         unsafe {
             self.gl.use_program(Some(self.program));
             self.gl.uniform_matrix_4_f32_slice(
-                Some(&self.view_loc),
+                self.view_loc.as_ref(),
                 true,
                 std::slice::from_raw_parts(transform.arr[0].as_ptr(), 16),
             );
@@ -206,7 +196,7 @@ impl<'a> MeshRenderer<'a> {
             let length: f32 = dir.iter().map(|v| v * v).sum();
 
             self.gl.uniform_3_f32(
-                Some(&self.light_dir_loc),
+                self.light_dir_loc.as_ref(),
                 dir[0] / length,
                 dir[1] / length,
                 dir[2] / length,
@@ -220,7 +210,7 @@ impl<'a> MeshRenderer<'a> {
             self.gl.use_program(Some(self.program));
 
             self.gl
-                .uniform_3_f32(Some(&self.light_color_loc), color[0], color[1], color[2]);
+                .uniform_3_f32(self.light_color_loc.as_ref(), color[0], color[1], color[2]);
             self.gl.use_program(None);
         }
     }
@@ -229,7 +219,8 @@ impl<'a> MeshRenderer<'a> {
         unsafe {
             self.gl.use_program(Some(self.program));
 
-            self.gl.uniform_1_f32(Some(&self.aspect_loc), aspect_ratio);
+            self.gl
+                .uniform_1_f32(self.aspect_loc.as_ref(), aspect_ratio);
             self.gl.use_program(None);
         }
     }
@@ -245,7 +236,7 @@ impl<'a> MeshRenderer<'a> {
             gl.bind_texture(glow::TEXTURE_2D, Some(mesh.tex));
 
             gl.uniform_matrix_4_f32_slice(
-                Some(&self.model_loc),
+                self.model_loc.as_ref(),
                 true,
                 std::slice::from_raw_parts(transform.arr[0].as_ptr(), 16),
             );
