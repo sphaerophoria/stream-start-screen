@@ -249,7 +249,7 @@ impl App<'_> {
     }
 
     fn light_transform(&self) -> Transform {
-        Transform::scale(1.0, 0.5, 1.0 / 10.0)
+        Transform::scale(0.75, 0.5, 1.0 / 10.0)
             * Transform::look_at(
                 [0.0, 0.0, 0.0].into(),
                 self.light_dir,
@@ -282,14 +282,18 @@ impl App<'_> {
         self.current_animation.update(now);
 
         self.time += time_since_last;
+        let z_offs = f32::sin(self.time / 8.0) * 0.05;
+        let y_offs = f32::cos(self.time / 8.0) * 0.05;
         self.view_matrix = Transform::scale(1.0 / WINDOW_ASPECT, 1.0, 1.0)
-            * Transform::perspective(90.0f32.to_radians(), 0.1, 10.0)
-            * (Transform::from_axis_angle(self.time, mat::Axis::Y)
-                * Transform::from_axis_angle(0.5, mat::Axis::X)
-                * Transform::from_translation(0.0, 0.0, -1.5))
+            * Transform::perspective(70.0f32.to_radians(), 0.1, 10.0)
+            * Transform::look_at(
+                [0.5, 0.20 + y_offs, -0.10 + z_offs].into(),
+                [0.05, 0.07, 0.0].into(),
+                [0.0, 1.0, 0.0].into(),
+            )
             .inverted();
         self.light_dir = [-0.3, -1.0, -0.6].into();
-        self.mesh_renderer.set_light_color(&[0.8, 0.8, 0.7]);
+        self.mesh_renderer.set_light_color(&[0.8, 0.8, 0.5]);
         self.last_update = now;
     }
 

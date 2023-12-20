@@ -32,7 +32,7 @@ void main() {
     vec4 light_pos = pos;
     light_pos = view_pos_to_light_pos * light_pos;
 
-    vec4 light_tex_depth = texture(light_tex, ndc_to_uv(light_pos.xy));
+    vec4 light_tex_depth = texture(light_tex, clamp(ndc_to_uv(light_pos.xy), 0.0, 1.0));
     float lit_mul = (ndc_to_uv(light_pos.z - 0.01) < light_tex_depth.r) ? 1.0 : 0.0;
 
     out_color = texture(tex, adjusted_uv);
