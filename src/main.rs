@@ -257,8 +257,8 @@ impl App<'_> {
             * Transform::from_axis_angle(0.5, mat::Axis::X)
             * Transform::from_translation(0.0, 0.0, -1.5);
         self.mesh_renderer.set_camera_transform(&camera_pos);
-        self.mesh_renderer
-            .set_light_dir(&[f32::cos(self.time), -1.0, f32::sin(self.time)]);
+        let light_dir = [f32::cos(self.time), -1.0, f32::sin(self.time)].into();
+        self.mesh_renderer.set_light_dir(&light_dir);
         self.mesh_renderer.set_light_color(&[0.8, 0.8, 0.7]);
         self.last_update = now;
     }

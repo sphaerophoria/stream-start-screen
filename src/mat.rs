@@ -1,3 +1,52 @@
+use std::convert::From;
+
+#[derive(Debug, Copy, Clone)]
+pub struct Vec3([f32; 3]);
+
+impl Vec3 {
+    pub fn x(&self) -> f32 {
+        self.0[0]
+    }
+
+    pub fn y(&self) -> f32 {
+        self.0[1]
+    }
+
+    pub fn z(&self) -> f32 {
+        self.0[2]
+    }
+
+    pub fn length(&self) -> f32 {
+        let l_2 = self.0.iter().map(|v| v * v).sum();
+        f32::sqrt(l_2)
+    }
+
+    pub fn normalized(&self) -> Vec3 {
+        let l = self.length();
+
+        [self.x() / l, self.y() / l, self.z() / l].into()
+    }
+}
+
+impl From<[f32; 3]> for Vec3 {
+    fn from(value: [f32; 3]) -> Self {
+        Self(value)
+    }
+}
+
+impl std::ops::Sub for Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        let mut ret = [0.0f32; 3];
+        for i in 0..3 {
+            ret[i] = self.0[i] - rhs.0[i]
+        }
+
+        ret.into()
+    }
+}
+
 #[allow(unused)]
 pub enum Axis {
     X,

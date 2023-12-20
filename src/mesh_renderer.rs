@@ -2,7 +2,7 @@ use glow::{HasContext, NativeBuffer, NativeProgram, NativeTexture, NativeVertexA
 
 use thiserror::Error;
 
-use crate::mat::Transform;
+use crate::mat::{Transform, Vec3};
 use crate::obj_parser::{Mesh, VertData};
 use crate::{gl_util, GlError};
 
@@ -189,17 +189,17 @@ impl<'a> MeshRenderer<'a> {
         }
     }
 
-    pub fn set_light_dir(&self, dir: &[f32; 3]) {
+    pub fn set_light_dir(&self, dir: &Vec3) {
         unsafe {
             self.gl.use_program(Some(self.program));
 
-            let length: f32 = dir.iter().map(|v| v * v).sum();
+            let normalized = dir.normalized();
 
             self.gl.uniform_3_f32(
                 self.light_dir_loc.as_ref(),
-                dir[0] / length,
-                dir[1] / length,
-                dir[2] / length,
+                normalized.x(),
+                normalized.y(),
+                normalized.z(),
             );
             self.gl.use_program(None);
         }
