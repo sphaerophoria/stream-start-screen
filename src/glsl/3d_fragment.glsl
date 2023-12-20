@@ -36,5 +36,7 @@ void main() {
     float lit_mul = (ndc_to_uv(light_pos.z - 0.01) < light_tex_depth.r) ? 1.0 : 0.0;
 
     out_color = texture(tex, adjusted_uv);
-    out_color.xyz = out_color.xyz * -dot(normal, light_dir) * light_color * lit_mul;
+    vec3 ambient = out_color.xyz * 0.2 * light_color;
+    vec3 diffuse = max(out_color.xyz * -dot(normal, light_dir) * lit_mul * light_color, 0.0);
+    out_color.xyz = min(diffuse + ambient , vec3(1.0));
 }
