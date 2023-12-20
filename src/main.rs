@@ -175,6 +175,7 @@ struct App<'a> {
     monitor: GpuMesh<'a>,
     screen: GpuMesh<'a>,
     table: GpuMesh<'a>,
+    walls: GpuMesh<'a>,
 }
 
 impl App<'_> {
@@ -201,6 +202,8 @@ impl App<'_> {
             .map_err(MainError::LoadScreen)?;
         let table = obj_parser::Mesh::from_obj_file(include_bytes!("../table.obj").as_slice())
             .map_err(MainError::LoadTable)?;
+        let walls = obj_parser::Mesh::from_obj_file(include_bytes!("../walls.obj").as_slice())
+            .map_err(MainError::LoadWalls)?;
 
         let monitor_tex =
             load_texture_from_png(gl, include_bytes!("../monitor_texture.png").as_slice());
@@ -208,6 +211,7 @@ impl App<'_> {
             load_texture_from_png(gl, include_bytes!("../screen_textuire.png").as_slice());
         let table_tex =
             load_texture_from_png(gl, include_bytes!("../table_texture.png").as_slice());
+        let walls_tex = load_texture_from_png(gl, include_bytes!("../wall_texture.png").as_slice());
 
         let monitor = mesh_renderer
             .upload_mesh(&monitor, monitor_tex)
@@ -218,6 +222,9 @@ impl App<'_> {
         let table = mesh_renderer
             .upload_mesh(&table, table_tex)
             .map_err(MainError::UploadTable)?;
+        let walls = mesh_renderer
+            .upload_mesh(&walls, walls_tex)
+            .map_err(MainError::UploadWalls)?;
 
         Ok(App {
             args,
@@ -237,6 +244,7 @@ impl App<'_> {
             monitor,
             screen,
             table,
+            walls,
         })
     }
 
@@ -292,6 +300,8 @@ impl App<'_> {
             .render(&self.table, &Transform::identity());
         self.mesh_renderer.render(&self.monitor, &monitor_transform);
         self.mesh_renderer.render(&self.screen, &monitor_transform);
+        self.mesh_renderer
+            .render(&self.walls, &Transform::scale(1.0, 1.0, -1.0));
     }
 
     fn render_light_depth(&self) -> NativeTexture {
@@ -373,12 +383,16 @@ enum MainError {
     CreateMeshRenderer(GlError),
     #[error("failed to load table obj")]
     LoadTable(ObjParseError),
+    #[error("failed to load walls obj")]
+    LoadWalls(ObjParseError),
     #[error("failed to load monitor obj")]
     LoadMonitor(ObjParseError),
     #[error("failed to load screen obj")]
     LoadScreen(ObjParseError),
     #[error("failed to upload table to gpu")]
     UploadTable(UploadMeshError),
+    #[error("failed to upload walls to gpu")]
+    UploadWalls(UploadMeshError),
     #[error("failed to upload monitor to gpu")]
     UploadMonitor(UploadMeshError),
     #[error("failed to upload screen to gpu")]
