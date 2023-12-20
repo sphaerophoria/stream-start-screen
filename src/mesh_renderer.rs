@@ -45,7 +45,6 @@ pub struct MeshRenderer<'a> {
     view_loc: Option<<glow::Context as HasContext>::UniformLocation>,
     light_dir_loc: Option<<glow::Context as HasContext>::UniformLocation>,
     light_color_loc: Option<<glow::Context as HasContext>::UniformLocation>,
-    aspect_loc: Option<<glow::Context as HasContext>::UniformLocation>,
     gl: &'a glow::Context,
 }
 
@@ -72,8 +71,6 @@ impl<'a> MeshRenderer<'a> {
 
             let light_color_loc = gl.get_uniform_location(program, "light_color");
 
-            let aspect_loc = gl.get_uniform_location(program, "aspect");
-
             Ok(MeshRenderer {
                 program,
                 vert_loc,
@@ -81,7 +78,6 @@ impl<'a> MeshRenderer<'a> {
                 view_loc,
                 light_dir_loc,
                 light_color_loc,
-                aspect_loc,
                 uv_loc,
                 norm_loc,
                 gl,
@@ -211,16 +207,6 @@ impl<'a> MeshRenderer<'a> {
 
             self.gl
                 .uniform_3_f32(self.light_color_loc.as_ref(), color[0], color[1], color[2]);
-            self.gl.use_program(None);
-        }
-    }
-
-    pub fn set_aspect(&self, aspect_ratio: f32) {
-        unsafe {
-            self.gl.use_program(Some(self.program));
-
-            self.gl
-                .uniform_1_f32(self.aspect_loc.as_ref(), aspect_ratio);
             self.gl.use_program(None);
         }
     }

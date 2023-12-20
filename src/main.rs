@@ -252,10 +252,13 @@ impl App<'_> {
 
         self.current_animation.update(now);
 
-        self.time -= time_since_last;
-        let camera_pos = Transform::from_axis_angle(self.time, mat::Axis::Y)
-            * Transform::from_axis_angle(0.5, mat::Axis::X)
-            * Transform::from_translation(0.0, 0.0, -1.5);
+        self.time += time_since_last;
+        let camera_pos = Transform::scale(1.0 / WINDOW_ASPECT, 1.0, 1.0)
+            * Transform::perspective(90.0f32.to_radians(), 0.1, 10.0)
+            * (Transform::from_axis_angle(self.time, mat::Axis::Y)
+                * Transform::from_axis_angle(0.5, mat::Axis::X)
+                * Transform::from_translation(0.0, 0.0, -1.5))
+            .inverted();
         self.mesh_renderer.set_camera_transform(&camera_pos);
         let light_dir = [f32::cos(self.time), -1.0, f32::sin(self.time)].into();
         self.mesh_renderer.set_light_dir(&light_dir);
@@ -292,7 +295,6 @@ impl App<'_> {
             );
         }
 
-        self.mesh_renderer.set_aspect(WINDOW_ASPECT);
         self.mesh_renderer
             .render(&self.table, &Transform::from_translation(0.0, 0.0, 0.0));
         self.mesh_renderer

@@ -19,21 +19,13 @@ uniform mat4 view = mat4(
     0, 0, 0, 1
 );
 
-uniform float aspect = 1.0;
-
 out vec2 uv;
 out vec3 normal;
 
 void main() {
     vec4 out_vert = in_vert;
 
-    out_vert = inverse(view) * model * out_vert;
-
-    out_vert.xy /= out_vert.z;
-    out_vert.z -= 1.0;
-    out_vert.z /= 100.0;
-
-    out_vert.x /= aspect;
+    out_vert = view * model * out_vert;
 
     gl_Position = out_vert;
 
