@@ -291,10 +291,10 @@ impl App<'_> {
         let z_offs = f32::sin(self.time / 8.0) * 0.05;
         let y_offs = f32::cos(self.time / 8.0) * 0.05;
         self.view_matrix = Transform::scale(1.0 / WINDOW_ASPECT, 1.0, 1.0)
-            * Transform::perspective(70.0f32.to_radians(), 0.1, 10.0)
+            * Transform::perspective(50.0f32.to_radians(), 0.1, 10.0)
             * Transform::look_at(
-                [0.5, 0.20 + y_offs, -0.10 + z_offs].into(),
-                [0.05, 0.07, 0.0].into(),
+                [0.6, 0.20 + y_offs, -0.05 + z_offs].into(),
+                [0.16, 0.045, 0.0].into(),
                 [0.0, 1.0, 0.0].into(),
             )
             .inverted();
@@ -304,8 +304,8 @@ impl App<'_> {
     }
 
     fn render_objects(&self) {
-        let monitor_transform =
-            Transform::from_translation(0.0, 0.08, 0.0) * Transform::scale(1.5, 1.5, 1.5);
+        let monitor_transform = Transform::from_translation(0.0, 0.04, 0.0)
+            * Transform::scale(1.5, 1.5 * 4.0 / 5.0, 1.5);
         self.mesh_renderer
             .render(&self.table, &Transform::identity());
         self.mesh_renderer.render(&self.monitor, &monitor_transform);

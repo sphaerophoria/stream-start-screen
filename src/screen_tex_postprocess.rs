@@ -126,7 +126,7 @@ impl<'a> ScreenTexPostprocessor<'a> {
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.vbo));
 
             gl.uniform_1_f32(Some(&self.aspect_loc), aspect);
-            gl.uniform_1_f32(Some(&self.time_loc), time * 20.0);
+            gl.uniform_1_f32(Some(&self.time_loc), time * 5.0);
 
             gl.active_texture(glow::TEXTURE0);
             gl.bind_texture(glow::TEXTURE_2D, Some(tex));
