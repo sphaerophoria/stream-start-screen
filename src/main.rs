@@ -14,6 +14,7 @@ use glow::{HasContext, NativeTexture};
 
 use chrono::NaiveTime;
 
+use mat::Vec3;
 use mesh_renderer::{GpuMesh, UploadMeshError};
 use obj_parser::ObjParseError;
 use thiserror::Error;
@@ -158,6 +159,7 @@ fn init_gl(window: &mut glfw::PWindow) -> glow::Context {
 
 struct App<'a> {
     args: &'a Args,
+    gl: &'a glow::Context,
     glyph_renderer: GlyphRenderer<'a>,
     cursor_renderer: CursorRenderer<'a>,
     mesh_renderer: &'a MeshRenderer<'a>,
@@ -168,6 +170,8 @@ struct App<'a> {
     cursor_blink_duration: Duration,
     last_update: Instant,
     time: f32,
+    light_dir: Vec3,
+    view_matrix: Transform,
     monitor: GpuMesh<'a>,
     screen: GpuMesh<'a>,
     table: GpuMesh<'a>,
@@ -217,6 +221,7 @@ impl App<'_> {
 
         Ok(App {
             args,
+            gl,
             glyph_renderer,
             cursor_renderer,
             mesh_renderer,
@@ -227,10 +232,26 @@ impl App<'_> {
             cursor_blink_duration,
             time: 0.0,
             last_update: Instant::now(),
+            light_dir: [0.0f32, 0.0f32, 0.0f32].into(),
+            view_matrix: Transform::identity(),
             monitor,
             screen,
             table,
         })
+    }
+
+    fn light_transform(&self) -> Transform {
+        Transform::scale(1.0, 0.5, 1.0 / 10.0)
+            * Transform::look_at(
+                [0.0, 0.0, 0.0].into(),
+                self.light_dir,
+                [0.0, 1.0, 0.0].into(),
+            )
+            .inverted()
+    }
+
+    fn view_pos_to_light_pos(&self) -> Transform {
+        self.light_transform() * self.view_matrix.inverted()
     }
 
     fn update(&mut self, now: Instant) {
@@ -253,20 +274,59 @@ impl App<'_> {
         self.current_animation.update(now);
 
         self.time += time_since_last;
-        let camera_pos = Transform::scale(1.0 / WINDOW_ASPECT, 1.0, 1.0)
+        self.view_matrix = Transform::scale(1.0 / WINDOW_ASPECT, 1.0, 1.0)
             * Transform::perspective(90.0f32.to_radians(), 0.1, 10.0)
             * (Transform::from_axis_angle(self.time, mat::Axis::Y)
                 * Transform::from_axis_angle(0.5, mat::Axis::X)
                 * Transform::from_translation(0.0, 0.0, -1.5))
             .inverted();
-        self.mesh_renderer.set_camera_transform(&camera_pos);
-        let light_dir = [f32::cos(self.time), -1.0, f32::sin(self.time)].into();
-        self.mesh_renderer.set_light_dir(&light_dir);
+        self.light_dir = [-0.3, -1.0, -0.6].into();
         self.mesh_renderer.set_light_color(&[0.8, 0.8, 0.7]);
         self.last_update = now;
     }
 
+    fn render_objects(&self) {
+        let monitor_transform =
+            Transform::from_translation(0.0, 0.08, 0.0) * Transform::scale(1.5, 1.5, 1.5);
+        self.mesh_renderer
+            .render(&self.table, &Transform::identity());
+        self.mesh_renderer.render(&self.monitor, &monitor_transform);
+        self.mesh_renderer.render(&self.screen, &monitor_transform);
+    }
+
+    fn render_light_depth(&self) -> NativeTexture {
+        unsafe {
+            let (tex, fb) = gl_util::setup_depth_texture_render(self.gl, 4096, 4096).unwrap();
+
+            self.gl.clear(glow::DEPTH_BUFFER_BIT);
+            self.mesh_renderer
+                .set_camera_transform(&self.light_transform());
+            self.render_objects();
+
+            self.gl.delete_framebuffer(fb);
+            tex
+        }
+    }
+
     fn render(&mut self, now: Instant) {
+        unsafe {
+            let tex = self.render_light_depth();
+
+            self.gl
+                .clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
+            self.gl
+                .viewport(0, 0, WINDOW_WIDTH as i32, WINDOW_HEIGHT as i32);
+
+            self.mesh_renderer.set_camera_transform(&self.view_matrix);
+            self.mesh_renderer
+                .set_view_to_light_transform(&self.view_pos_to_light_pos());
+            self.mesh_renderer.set_light_dir(&self.light_dir);
+            self.mesh_renderer.set_light_texture(tex);
+            self.render_objects();
+
+            self.gl.delete_texture(tex);
+        }
+
         let s = self.current_animation.as_str();
 
         let mut cursor_pos_x = 0.05;
@@ -294,13 +354,6 @@ impl App<'_> {
                 WINDOW_ASPECT,
             );
         }
-
-        self.mesh_renderer
-            .render(&self.table, &Transform::from_translation(0.0, 0.0, 0.0));
-        self.mesh_renderer
-            .render(&self.monitor, &Transform::from_translation(0.0, 0.0, 0.0));
-        self.mesh_renderer
-            .render(&self.screen, &Transform::from_translation(0.0, 0.0, 0.0));
     }
 }
 

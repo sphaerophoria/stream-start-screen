@@ -1,6 +1,40 @@
-use glow::{HasContext, NativeProgram, NativeShader, NativeTexture};
+use glow::{HasContext, NativeFramebuffer, NativeProgram, NativeShader, NativeTexture};
 
 use crate::GlError;
+
+pub unsafe fn setup_depth_texture_render(
+    gl: &glow::Context,
+    width: i32,
+    height: i32,
+) -> Result<(NativeTexture, NativeFramebuffer), GlError> {
+    let tex = create_tex_default_params(gl)?;
+    gl.bind_texture(glow::TEXTURE_2D, Some(tex));
+    gl.tex_image_2d(
+        glow::TEXTURE_2D,
+        0,
+        glow::DEPTH_COMPONENT as i32,
+        width,
+        height,
+        0,
+        glow::DEPTH_COMPONENT,
+        glow::FLOAT,
+        None,
+    );
+
+    let fb = gl.create_framebuffer().map_err(GlError)?;
+    gl.bind_framebuffer(glow::FRAMEBUFFER, Some(fb));
+    gl.framebuffer_texture(glow::FRAMEBUFFER, glow::DEPTH_ATTACHMENT, Some(tex), 0);
+
+    let buffers: [u32; 1] = [glow::DEPTH_ATTACHMENT];
+    gl.draw_buffers(&buffers);
+    let fb_status = gl.check_framebuffer_status(glow::FRAMEBUFFER);
+    if fb_status != glow::FRAMEBUFFER_COMPLETE {
+        panic!("incomplete framebuffer: {fb_status:#x}");
+    }
+    gl.viewport(0, 0, width, height);
+
+    Ok((tex, fb))
+}
 
 pub unsafe fn create_tex_default_params(gl: &glow::Context) -> Result<NativeTexture, GlError> {
     let texture = gl.create_texture().map_err(GlError)?;

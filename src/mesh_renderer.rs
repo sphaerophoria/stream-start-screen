@@ -43,8 +43,10 @@ pub struct MeshRenderer<'a> {
     norm_loc: Option<u32>,
     model_loc: Option<<glow::Context as HasContext>::UniformLocation>,
     view_loc: Option<<glow::Context as HasContext>::UniformLocation>,
+    view_to_light_loc: Option<<glow::Context as HasContext>::UniformLocation>,
     light_dir_loc: Option<<glow::Context as HasContext>::UniformLocation>,
     light_color_loc: Option<<glow::Context as HasContext>::UniformLocation>,
+    light_tex_loc: Option<<glow::Context as HasContext>::UniformLocation>,
     gl: &'a glow::Context,
 }
 
@@ -71,6 +73,10 @@ impl<'a> MeshRenderer<'a> {
 
             let light_color_loc = gl.get_uniform_location(program, "light_color");
 
+            let view_to_light_loc = gl.get_uniform_location(program, "view_pos_to_light_pos");
+
+            let light_tex_loc = gl.get_uniform_location(program, "light_tex");
+
             Ok(MeshRenderer {
                 program,
                 vert_loc,
@@ -78,6 +84,8 @@ impl<'a> MeshRenderer<'a> {
                 view_loc,
                 light_dir_loc,
                 light_color_loc,
+                view_to_light_loc,
+                light_tex_loc,
                 uv_loc,
                 norm_loc,
                 gl,
@@ -181,6 +189,28 @@ impl<'a> MeshRenderer<'a> {
                 true,
                 std::slice::from_raw_parts(transform.arr[0].as_ptr(), 16),
             );
+            self.gl.use_program(None);
+        }
+    }
+
+    pub fn set_view_to_light_transform(&self, transform: &Transform) {
+        unsafe {
+            self.gl.use_program(Some(self.program));
+            self.gl.uniform_matrix_4_f32_slice(
+                self.view_to_light_loc.as_ref(),
+                true,
+                std::slice::from_raw_parts(transform.arr[0].as_ptr(), 16),
+            );
+            self.gl.use_program(None);
+        }
+    }
+
+    pub fn set_light_texture(&self, tex: NativeTexture) {
+        unsafe {
+            self.gl.use_program(Some(self.program));
+            self.gl.uniform_1_i32(self.light_tex_loc.as_ref(), 1);
+            self.gl.active_texture(glow::TEXTURE1);
+            self.gl.bind_texture(glow::TEXTURE_2D, Some(tex));
             self.gl.use_program(None);
         }
     }

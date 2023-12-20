@@ -319,6 +319,41 @@ impl Transform {
 
         Transform { arr }
     }
+
+    pub fn look_at(eye: Vec3, center: Vec3, up: Vec3) -> Transform {
+        let mut transform = Transform::identity();
+
+        // We want to look at the center from our eye, so that should be our new Z axis
+        let new_forward = (center - eye).normalized();
+        // The new sideways is the axis perpendicular to both up and forward
+        let new_sideways = Vec3([0.0, 0.0, 0.0]) - cross(new_forward, up.normalized()).normalized();
+        // Adjust our up position to be orthogonal to the other two axis
+        let new_up = Vec3([0.0, 0.0, 0.0]) - cross(new_sideways, new_forward);
+
+        // Now just apply those by sticking them in the output transform. Imagine putting [1, 0,
+        // 0], [0, 1, 0], [0, 0, 1], and it should make sense
+        transform.arr[0][0] = new_sideways.x();
+        transform.arr[1][0] = new_sideways.y();
+        transform.arr[2][0] = new_sideways.z();
+
+        transform.arr[0][1] = new_up.x();
+        transform.arr[1][1] = new_up.y();
+        transform.arr[2][1] = new_up.z();
+
+        transform.arr[0][2] = new_forward.x();
+        transform.arr[1][2] = new_forward.y();
+        transform.arr[2][2] = new_forward.z();
+
+        // And set the position as well
+        transform.arr[0][3] = eye.x();
+        transform.arr[1][3] = eye.y();
+        transform.arr[2][3] = eye.z();
+
+        //let mut translation = Transform::identity();
+        //translation.arr[2][3] = length(center-eye);
+
+        transform
+    }
 }
 
 impl std::ops::Mul<&Self> for Transform {
@@ -344,9 +379,29 @@ impl std::ops::Mul<Self> for Transform {
     }
 }
 
+pub fn cross(a: Vec3, b: Vec3) -> Vec3 {
+    [
+        a.0[1] * b.0[2] - a.0[2] * b.0[1],
+        a.0[2] * b.0[0] - a.0[0] * b.0[2],
+        a.0[0] * b.0[1] - a.0[1] * b.0[0],
+    ]
+    .into()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_cross() {
+        let expected = [-3., 6., -3.];
+        for (expected, calculated) in expected
+            .iter()
+            .zip(cross([1.0, 2.0, 3.0].into(), [4.0, 5.0, 6.0].into()).0)
+        {
+            assert!(f32::abs(expected - calculated) < 0.001);
+        }
+    }
 
     #[test]
     fn test_simple_mul() {
