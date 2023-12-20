@@ -12,7 +12,7 @@ pub struct GpuMesh<'a> {
     vbo: NativeBuffer,
     ebo: NativeBuffer,
     // NOTE: Not owned, do not free
-    tex: NativeTexture,
+    pub tex: NativeTexture,
     num_elements: i32,
 }
 

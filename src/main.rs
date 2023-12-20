@@ -17,6 +17,7 @@ use chrono::NaiveTime;
 use mat::Vec3;
 use mesh_renderer::{GpuMesh, UploadMeshError};
 use obj_parser::ObjParseError;
+use screen_tex_postprocess::ScreenTexPostprocessor;
 use thiserror::Error;
 
 use std::{
@@ -33,6 +34,7 @@ mod glyph_renderer;
 mod mat;
 mod mesh_renderer;
 mod obj_parser;
+mod screen_tex_postprocess;
 
 #[derive(Error, Debug)]
 #[error("{0}")]
@@ -162,6 +164,7 @@ struct App<'a> {
     gl: &'a glow::Context,
     glyph_renderer: GlyphRenderer<'a>,
     cursor_renderer: CursorRenderer<'a>,
+    screen_tex_postprocessor: ScreenTexPostprocessor<'a>,
     mesh_renderer: &'a MeshRenderer<'a>,
     current_animation: Animation,
     animation_queue: VecDeque<AnimationReq>,
@@ -196,6 +199,8 @@ impl App<'_> {
         let cursor_blink_duration: Duration = Duration::from_secs_f32(0.5);
         let cursor_flip_time = Instant::now() + cursor_blink_duration;
 
+        let screen_tex_postprocessor = ScreenTexPostprocessor::new(gl)
+            .map_err(MainError::CreateScreenTexPostProcessorError)?;
         let monitor = obj_parser::Mesh::from_obj_file(include_bytes!("../monitor.obj").as_slice())
             .map_err(MainError::LoadMonitor)?;
         let screen = obj_parser::Mesh::from_obj_file(include_bytes!("../screen.obj").as_slice())
@@ -232,6 +237,7 @@ impl App<'_> {
             glyph_renderer,
             cursor_renderer,
             mesh_renderer,
+            screen_tex_postprocessor,
             current_animation,
             animation_queue,
             cursor_visible,
@@ -322,9 +328,56 @@ impl App<'_> {
         }
     }
 
+    fn render_text_to_texture(&mut self, now: Instant) -> NativeTexture {
+        unsafe {
+            let (tex, fb) = gl_util::setup_color_texture_render(self.gl, 1024, 1024).unwrap();
+            self.gl.clear_color(0.0, 0.0, 0.0, 1.0);
+            self.gl
+                .clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
+
+            let s = self.current_animation.as_str();
+
+            let mut cursor_pos_x = 0.05;
+            let mut cursor_pos_y = 0.7;
+            let cursor_update =
+                self.glyph_renderer
+                    .render_str(s, cursor_pos_x, cursor_pos_y, WINDOW_ASPECT);
+
+            cursor_pos_x += cursor_update.0;
+            cursor_pos_y += cursor_update.1;
+
+            if self.cursor_flip_time < now {
+                self.cursor_flip_time += self.cursor_blink_duration;
+                self.cursor_visible = !self.cursor_visible;
+            }
+
+            if self.cursor_visible {
+                let cursor_height = self.glyph_renderer.line_height() * 0.6;
+                let cursor_width = cursor_height / 2.0;
+                self.cursor_renderer.render(
+                    cursor_pos_x,
+                    cursor_pos_y,
+                    cursor_width,
+                    cursor_height,
+                    WINDOW_ASPECT,
+                );
+            }
+
+            let (tex2, fb2) = gl_util::setup_color_texture_render(self.gl, 1024, 1024).unwrap();
+            self.screen_tex_postprocessor
+                .render(tex, self.time, WINDOW_ASPECT);
+
+            self.gl.delete_framebuffer(fb);
+            self.gl.delete_framebuffer(fb2);
+            self.gl.delete_texture(tex);
+            tex2
+        }
+    }
+
     fn render(&mut self, now: Instant) {
         unsafe {
             let tex = self.render_light_depth();
+            let screen_tex = self.render_text_to_texture(now);
 
             self.gl
                 .clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
@@ -336,37 +389,11 @@ impl App<'_> {
                 .set_view_to_light_transform(&self.view_pos_to_light_pos());
             self.mesh_renderer.set_light_dir(&self.light_dir);
             self.mesh_renderer.set_light_texture(tex);
+            self.screen.tex = screen_tex;
             self.render_objects();
 
             self.gl.delete_texture(tex);
-        }
-
-        let s = self.current_animation.as_str();
-
-        let mut cursor_pos_x = 0.05;
-        let mut cursor_pos_y = 0.7;
-        let cursor_update =
-            self.glyph_renderer
-                .render_str(s, cursor_pos_x, cursor_pos_y, WINDOW_ASPECT);
-
-        cursor_pos_x += cursor_update.0;
-        cursor_pos_y += cursor_update.1;
-
-        if self.cursor_flip_time < now {
-            self.cursor_flip_time += self.cursor_blink_duration;
-            self.cursor_visible = !self.cursor_visible;
-        }
-
-        if self.cursor_visible {
-            let cursor_height = self.glyph_renderer.line_height() * 0.6;
-            let cursor_width = cursor_height / 2.0;
-            self.cursor_renderer.render(
-                cursor_pos_x,
-                cursor_pos_y,
-                cursor_width,
-                cursor_height,
-                WINDOW_ASPECT,
-            );
+            self.gl.delete_texture(screen_tex);
         }
     }
 }
@@ -383,6 +410,8 @@ enum MainError {
     CreateGlyphRenderer(GlError),
     #[error("failed to create cursor renderer")]
     CreateCursorRenderer(GlError),
+    #[error("failed to create screen text postprocessor")]
+    CreateScreenTexPostProcessorError(GlError),
     #[error("failed to create mesh renderer")]
     CreateMeshRenderer(GlError),
     #[error("failed to load table obj")]
@@ -477,8 +506,6 @@ fn main() -> Result<(), MainError> {
     let mut app = App::new(&gl, &args, &mut glyph_cache, &mesh_renderer)?;
 
     while !window.should_close() {
-        unsafe { gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT) };
-
         let now = Instant::now();
         app.update(now);
         app.render(now);
